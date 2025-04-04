@@ -93,6 +93,7 @@ def handle_disruption(news):
             print(f"Attempt {attempt + 1} failed: {e}")
             results = None
     
+    df = st.session_state.current_data.copy()
     for result in results:
         print(result)
         stage=result['stage']
@@ -100,8 +101,8 @@ def handle_disruption(news):
 
 
         """Update costs and CO₂ in new columns while preserving original values"""
-        df = st.session_state.current_data.copy()
         idx = df[df["Stages"] == stage].index[0]
+        print(idx)
 
         if(choice == 'Default'):
 
@@ -113,7 +114,7 @@ def handle_disruption(news):
         df.at[idx, "New CO₂ (kg)"] = alt["CO₂"]
         
         df.at[idx, "Reason"] = result["reason"]
-
+    print(df)
     st.session_state.current_data = df
 
 
