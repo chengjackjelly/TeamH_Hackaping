@@ -6,20 +6,18 @@ import pandas as pd
 DEFAULT_DATA = {
     "Stages": [
         "Raw Material Extraction",
-        "Material Processing",
         "Component Manufacturing",
         "Final Assembly",
-        "Packaging & Distribution"
     ],
     "Default Choice": [
         "Global mix (Rio Tinto, Glencore, Exxon)",
-        "China-based processors",
         "TSMC (Taiwan), CATL (China), Samsung (Korea)",
         "Foxconn (China)",
-        "Maersk shipping + local packaging"
     ],
-    "Default Cost ($)": [25, 35, 300, 30, 15],
-    "Default CO₂ (kg)": [60, 120, 250, 15, 30]
+    "Default Cost ($)": [25, 35, 300, ],
+    "Default CO₂ (kg)": [60, 120, 250,],
+    "New Cost ($)": [25, 35, 300, ],
+    "New CO₂ (kg)": [60, 120, 250,]
 }
 
 # Alternative options for each stage
@@ -27,10 +25,6 @@ ALTERNATIVES = {
     "Raw Material Extraction": {
         "Conflict-free minerals": {"Cost": 35, "CO₂": 55, "Suppliers": "Pact-certified (Rwanda, Canada)"},
         "Recycled materials": {"Cost": 40, "CO₂": 30, "Suppliers": "Redwood Materials (US)"}
-    },
-    "Material Processing": {
-        "EU-based (renewable energy)": {"Cost": 50, "CO₂": 60, "Suppliers": "Hydro (Norway), Umicore (Belgium)"},
-        "Localized processing": {"Cost": 45, "CO₂": 90, "Suppliers": "Regional smelters"}
     },
     "Component Manufacturing": {
         "US chips (Intel)": {"Cost": 400, "CO₂": 200, "Suppliers": "Intel (US), Tesla (batteries)"},
@@ -40,29 +34,35 @@ ALTERNATIVES = {
         "Vietnam (renewables)": {"Cost": 35, "CO₂": 10, "Suppliers": "Luxshare (Vietnam)"},
         "Mexico (NAFTA)": {"Cost": 40, "CO₂": 18, "Suppliers": "Flex (Mexico)"}
     },
-    "Packaging & Distribution": {
-        "Carbon-neutral shipping": {"Cost": 25, "CO₂": 5, "Suppliers": "Maersk ECO Delivery"},
-        "Air freight (urgent)": {"Cost": 50, "CO₂": 80, "Suppliers": "DHL Express"}
-    }
 }
 
 # Initialize session state
 if 'current_data' not in st.session_state:
     st.session_state.current_data = pd.DataFrame(DEFAULT_DATA)
-
 def handle_disruption(stage, choice):
-    """Update costs and CO₂ based on user selection"""
+    """Update costs and CO₂ in new columns while preserving original values"""
     df = st.session_state.current_data.copy()
     idx = df[df['Stages'] == stage].index[0]
     
-    if choice != "Default":
+    # Initialize new columns if they don't exist
+    if "New Choice" not in df.columns:
+        df["New Choice"] = df["Default Choice"]
+        df["New Cost ($)"] = df["Default Cost ($)"]
+        df["New CO₂ (kg)"] = df["Default CO₂ (kg)"]
+    
+    if choice == "Default":
+        # Revert to default values
+        df.at[idx, "New Choice"] = df.at[idx, "Default Choice"]
+        df.at[idx, "New Cost ($)"] = df.at[idx, "Default Cost ($)"]
+        df.at[idx, "New CO₂ (kg)"] = df.at[idx, "Default CO₂ (kg)"]
+    else:
+        # Apply alternative values
         alt = ALTERNATIVES[stage][choice]
-        df.at[idx, "Default Choice"] = alt["Suppliers"]
-        df.at[idx, "Default Cost ($)"] = alt["Cost"]
-        df.at[idx, "Default CO₂ (kg)"] = alt["CO₂"]
+        df.at[idx, "New Choice"] = alt["Suppliers"]
+        df.at[idx, "New Cost ($)"] = alt["Cost"]
+        df.at[idx, "New CO₂ (kg)"] = alt["CO₂"]
     
     st.session_state.current_data = df
-
 # Streamlit UI
 st.title("🌍 Laptop Supply Chain Simulator")
 st.subheader("Simulate disruptions and see cost/CO₂ impact")
@@ -87,18 +87,51 @@ if st.button("Apply Change"):
     handle_disruption(stage, event)
     st.rerun()
 
-# 3. Comparison visualization
-st.header("📊 Impact Analysis")
-df = st.session_state.current_data
+# 3. Comparison visualization (updated)
+st.header("📊 Impact Comparison")
 
-fig1, ax1 = plt.subplots()
-ax1.bar(df['Stages'], df['Default Cost ($)'])
-plt.xticks(rotation=45)
+if 'previous_data' not in st.session_state:
+    st.session_state.previous_data = st.session_state.current_data.copy()
+
+# Calculate deltas
+delta_cost = st.session_state.current_data['New Cost ($)'].sum() - st.session_state.current_data['Default Cost ($)'].sum()
+delta_co2 = st.session_state.current_data['New CO₂ (kg)'].sum() - st.session_state.current_data['Default CO₂ (kg)'].sum()
+# Display delta metricsi
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Total Cost Change", 
+              f"${st.session_state.current_data['Default Cost ($)'].sum():.0f}",
+              delta=f"{delta_cost:.0f} $")
+with col2:
+    st.metric("Total CO₂ Change", 
+              f"{st.session_state.current_data['Default CO₂ (kg)'].sum():.0f} kg",
+              delta=f"{delta_co2:.0f} kg")
+
+# Side-by-side bar plots
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+# Cost comparison
+width = 0.35
+x = range(len(st.session_state.current_data))
+ax1.bar(x, st.session_state.current_data['Default Cost ($)'], width, label='Default', color='blue')
+ax1.bar([p + width for p in x], st.session_state.current_data['New Cost ($)'], width, label='After Event', color='orange')
+ax1.set_xticks([p + width/2 for p in x])
+ax1.set_xticklabels(st.session_state.current_data['Stages'], rotation=45)
 ax1.set_ylabel("Cost ($)")
-st.pyplot(fig1)
+ax1.set_title("Cost Comparison")
+ax1.legend()
 
-fig2, ax2 = plt.subplots()
-ax2.bar(df['Stages'], df['Default CO₂ (kg)'], color='orange')
-plt.xticks(rotation=45)
+# CO2 comparison
+ax2.bar(x, st.session_state.current_data['Default CO₂ (kg)'], width, label='Default', color='green')
+ax2.bar([p + width for p in x], st.session_state.current_data['New CO₂ (kg)'], width, label='After Event', color='red')
+ax2.set_xticks([p + width/2 for p in x])
+ax2.set_xticklabels(st.session_state.current_data['Stages'], rotation=45)
 ax2.set_ylabel("CO₂ (kg)")
-st.pyplot(fig2)
+ax2.set_title("CO₂ Footprint Comparison")
+ax2.legend()
+
+plt.tight_layout()
+st.pyplot(fig)
+
+# Update previous data (for next change)
+st.session_state.previous_data = st.session_state.current_data.copy()
