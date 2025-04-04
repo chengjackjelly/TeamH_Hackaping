@@ -176,14 +176,14 @@ delta_co2 = (
 col1, col2 = st.columns(2)
 with col1:
     st.metric(
-        "Total Cost Change",
-        f"${st.session_state.current_data['Default Cost ($)'].sum():.0f}",
+        "New Total Cost ",
+        f"${st.session_state.current_data['New Cost ($)'].sum():.0f}",
         delta=f"{delta_cost:.0f} $",
     )
 with col2:
     st.metric(
-        "Total CO₂ Change",
-        f"{st.session_state.current_data['Default CO₂ (kg)'].sum():.0f} kg",
+        "New Total CO₂ Change",
+        f"{st.session_state.current_data['New CO₂ (kg)'].sum():.0f} kg",
         delta=f"{delta_co2:.0f} kg",
     )
 

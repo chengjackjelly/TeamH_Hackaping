@@ -12,10 +12,10 @@ opper = Opper(api_key=OPPER_API_KEY)
 def ai_analyzer(news):
     result, _ = opper.call(
         name="onboarding",
-        input="""
-    News: China hits back at Trump tariffs with extra 34% tax on US goods, deepening market turmoil
-
-
+        input=f"""
+    News: {news}"""
+    +
+    """
     Supply-chain:
 
     Default:
