@@ -1,12 +1,18 @@
 from opperai import Opper
 import os
-import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Your API key will be loaded from the environment variable OPPER_API_KEY if not provided
 OPPER_API_KEY = os.getenv("OPPER_API_KEY")
 opper = Opper(api_key=OPPER_API_KEY)
+
+
 def ai_analyzer(news):
-    result, _ = opper.call(name="onboarding", input='''
+    result, _ = opper.call(
+        name="onboarding",
+        input="""
     News: China hits back at Trump tariffs with extra 34% tax on US goods, deepening market turmoil
 
 
@@ -65,6 +71,6 @@ def ai_analyzer(news):
 ]
 
 
-    ''')
+    """,
+    )
     return result
-
