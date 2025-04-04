@@ -1,6 +1,9 @@
 import streamlit as st
 import matplotlib.pyplot as plt  # This is what 'plt' refers to
 import pandas as pd
+import json
+
+from api.event import ai_analyzer
 
 # Default supply chain data (simplified from your schema)
 DEFAULT_DATA = {
@@ -36,6 +39,7 @@ DEFAULT_DATA = {
     ],
 }
 
+REASON=""
 # Alternative options for each stage
 ALTERNATIVES = {
     "Raw Material Extraction": {
@@ -77,28 +81,38 @@ if "current_data" not in st.session_state:
     st.session_state.current_data = pd.DataFrame(DEFAULT_DATA)
 
 
-def handle_disruption(stage, choice):
-    """Update costs and CO₂ in new columns while preserving original values"""
-    df = st.session_state.current_data.copy()
-    idx = df[df["Stages"] == stage].index[0]
+def handle_disruption(news):
+    """"ai analyzer"""
 
-    # Initialize new columns if they don't exist
-    if "New Choice" not in df.columns:
-        df["New Choice"] = df["Default Choice"]
-        df["New Cost ($)"] = df["Default Cost ($)"]
-        df["New CO₂ (kg)"] = df["Default CO₂ (kg)"]
+    for attempt in range(5):  # try up to 2 times
+        try:
+            raw = ai_analyzer(news)
+            results = json.loads(raw)
+            break  # success, exit loop
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            results = None
+    
+    for result in results:
+        print(result)
+        stage=result['stage']
+        choice=result['choice']
 
-    if choice == "Default":
-        # Revert to default values
-        df.at[idx, "New Choice"] = df.at[idx, "Default Choice"]
-        df.at[idx, "New Cost ($)"] = df.at[idx, "Default Cost ($)"]
-        df.at[idx, "New CO₂ (kg)"] = df.at[idx, "Default CO₂ (kg)"]
-    else:
-        # Apply alternative values
+
+        """Update costs and CO₂ in new columns while preserving original values"""
+        df = st.session_state.current_data.copy()
+        idx = df[df["Stages"] == stage].index[0]
+
+        if(choice == 'Default'):
+
+            df.at[idx, "Reason"] = result["reason"]
+            continue
         alt = ALTERNATIVES[stage][choice]
         df.at[idx, "New Choice"] = alt["Suppliers"]
         df.at[idx, "New Cost ($)"] = alt["Cost"]
         df.at[idx, "New CO₂ (kg)"] = alt["CO₂"]
+        
+        df.at[idx, "Reason"] = result["reason"]
 
     st.session_state.current_data = df
 
@@ -147,8 +161,6 @@ if st.button("Apply Event"):
 # 3. Comparison visualization (updated)
 st.header("📊 Impact Comparison")
 
-if "previous_data" not in st.session_state:
-    st.session_state.previous_data = st.session_state.current_data.copy()
 
 # Calculate deltas
 delta_cost = (
@@ -224,5 +236,5 @@ ax2.legend()
 plt.tight_layout()
 st.pyplot(fig)
 
-# Update previous data (for next change)
-st.session_state.previous_data = st.session_state.current_data.copy()
+
+st.write(st.session_state.current_data)
